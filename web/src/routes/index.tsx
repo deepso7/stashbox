@@ -34,7 +34,7 @@ function App() {
       >
         <Image
           alt="Stashbox"
-          className="-translate-y-1/2 absolute top-1/2 left-16"
+          className="-translate-y-1/2 absolute top-1/2 left-8"
           height={30}
           layout="fixed"
           src="/stashbox.png"
