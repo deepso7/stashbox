@@ -32,14 +32,6 @@ function App() {
         className="hover:-translate-y-1 relative w-1/2 transition delay-100 duration-300 ease-in-out hover:scale-110"
         size="lg"
       >
-        <Image
-          alt="Stashbox"
-          className="-translate-y-1/2 absolute top-1/2 left-8"
-          height={30}
-          layout="fixed"
-          src="/stashbox.png"
-          width={30}
-        />
         Get Started
       </Button>
     </div>

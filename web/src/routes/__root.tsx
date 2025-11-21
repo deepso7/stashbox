@@ -1,7 +1,7 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-
+import { MiniKitProvider } from "@worldcoin/minikit-js/minikit-provider";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
@@ -37,7 +37,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="vertical center mx-auto md:w-1/3">
-        {children}
+        <Providers>{children}</Providers>
         <TanStackDevtools
           config={{
             position: "bottom-right",
@@ -54,3 +54,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     </html>
   );
 }
+
+const Providers = ({ children }: { children: React.ReactNode }) => (
+  <MiniKitProvider>{children}</MiniKitProvider>
+);
