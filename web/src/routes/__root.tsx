@@ -27,6 +27,7 @@ export const Route = createRootRoute({
   }),
 
   shellComponent: RootDocument,
+  notFoundComponent: () => <div>Not Found</div>,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
@@ -35,7 +36,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body className="vertical center mx-auto md:w-1/3">
         {children}
         <TanStackDevtools
           config={{
