@@ -1,14 +1,21 @@
 import { AuthButton } from "@coinbase/cdp-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import { getCookies } from "@tanstack/react-start/server";
 import { Image } from "@unpic/react";
 
+const getUser = createServerFn({ method: "GET" }).handler(() => {
+  const cookies = getCookies();
+
+  console.log({ cookies });
+
+  return null;
+});
+
 export const Route = createFileRoute("/")({
   component: App,
-  loader: () => {
-    const cookies = getCookies();
-
-    console.log({ cookies });
+  loader: async () => {
+    await getUser();
 
     return null;
   },
