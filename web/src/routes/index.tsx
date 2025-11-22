@@ -1,8 +1,18 @@
+import { AuthButton } from "@coinbase/cdp-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { getCookies } from "@tanstack/react-start/server";
 import { Image } from "@unpic/react";
-import { Button } from "../components/ui/button";
 
-export const Route = createFileRoute("/")({ component: App });
+export const Route = createFileRoute("/")({
+  component: App,
+  loader: () => {
+    const cookies = getCookies();
+
+    console.log({ cookies });
+
+    return null;
+  },
+});
 
 function App() {
   return (
@@ -28,12 +38,8 @@ function App() {
         src="/stashbox.png"
         width={200}
       />
-      <Button
-        className="hover:-translate-y-1 relative w-1/2 transition delay-100 duration-300 ease-in-out hover:scale-110"
-        size="lg"
-      >
-        Get Started
-      </Button>
+
+      <AuthButton />
     </div>
   );
 }
