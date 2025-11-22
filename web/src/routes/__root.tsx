@@ -35,8 +35,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="vertical center mx-auto md:w-1/3">
-        <Providers>{children}</Providers>
+      <body className="vertical center mx-auto">
+        <Providers>
+          <div className="md:w-1/3">{children}</div>
+        </Providers>
         <TanStackDevtools
           config={{
             position: "bottom-right",
