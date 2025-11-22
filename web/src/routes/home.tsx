@@ -1,7 +1,9 @@
 import { usePrivy } from "@privy-io/react-auth";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { Image } from "@unpic/react";
+import { LogOut } from "lucide-react";
 import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import {
   Card,
   CardContent,
@@ -23,7 +25,8 @@ export const Route = createFileRoute("/home")({
 });
 
 function RouteComponent() {
-  const { user } = usePrivy();
+  const { user, logout } = usePrivy();
+  const router = useRouter();
 
   const username =
     user?.google?.name?.split(" ")[0] ??
@@ -41,9 +44,21 @@ function RouteComponent() {
           width={60}
         />
 
-        <Badge className="bg-amber-500 p-2">
-          <span className="animate-bounce">🔥</span>5
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge className="bg-amber-500 p-2">
+            <span className="animate-bounce">🔥</span>5
+          </Badge>
+
+          <Button
+            onClick={async () => {
+              await logout();
+              router.navigate({ to: "/" });
+            }}
+            size="icon"
+          >
+            <LogOut />
+          </Button>
+        </div>
       </div>
 
       <div className="mt-16">
@@ -51,7 +66,7 @@ function RouteComponent() {
         <p className="text-sm">Lets grow your stash!</p>
       </div>
 
-      <Card className="hover:-translate-y-1 w-full rounded-4xl bg-primary/50 transition delay-100 duration-150 ease-in-out hover:scale-105">
+      <Card className="hover:-translate-y-1 w-full rounded-4xl bg-primary/50 shadow-2xl transition delay-100 duration-150 ease-in-out hover:scale-105">
         <CardHeader>
           <CardTitle>Savings</CardTitle>
           <CardDescription>Total Saving till date</CardDescription>
