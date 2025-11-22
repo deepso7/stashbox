@@ -1,10 +1,18 @@
+import { CDPHooksProvider } from "@coinbase/cdp-hooks";
 import { CDPReactProvider } from "@coinbase/cdp-react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  Scripts,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import appCss from "../styles.css?url";
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient;
+}>()({
   head: () => ({
     meta: [
       {
@@ -27,7 +35,6 @@ export const Route = createRootRoute({
   }),
 
   shellComponent: RootDocument,
-  notFoundComponent: () => <div>Not Found</div>,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
@@ -92,6 +99,16 @@ const Providers = ({ children }: { children: React.ReactNode }) => (
       "font-size-base": "16px",
     }}
   >
-    {children}
+    <CDPHooksProvider
+      config={{
+        projectId: "4d35e6de-5016-495b-befb-719eee9d0afa",
+        ethereum: {
+          // if you want to create an EVM account on login
+          createOnLogin: "eoa", // or "smart" for smart accounts
+        },
+      }}
+    >
+      {children}
+    </CDPHooksProvider>
   </CDPReactProvider>
 );

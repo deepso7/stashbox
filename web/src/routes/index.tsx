@@ -1,27 +1,37 @@
+import { useIsInitialized, useIsSignedIn } from "@coinbase/cdp-hooks";
 import { AuthButton } from "@coinbase/cdp-react";
-import { createFileRoute } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { getCookies } from "@tanstack/react-start/server";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Image } from "@unpic/react";
-
-const getUser = createServerFn({ method: "GET" }).handler(() => {
-  const cookies = getCookies();
-
-  console.log({ cookies });
-
-  return null;
-});
+import { useEffect } from "react";
+import { Spinner } from "../components/ui/spinner";
 
 export const Route = createFileRoute("/")({
   component: App,
-  loader: async () => {
-    await getUser();
-
-    return null;
-  },
 });
 
 function App() {
+  const { isInitialized } = useIsInitialized();
+  const { isSignedIn } = useIsSignedIn();
+  const router = useRouter();
+
+  useEffect(() => {
+    console.log({ isSignedIn });
+
+    if (isSignedIn) {
+      router.navigate({
+        to: "/comps",
+      });
+    }
+  }, [isSignedIn, router]);
+
+  if (!isInitialized) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center p-4">
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-between p-4">
       <div className="vertical centre gap-16">
