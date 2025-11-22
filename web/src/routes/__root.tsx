@@ -1,5 +1,4 @@
-import { CDPHooksProvider } from "@coinbase/cdp-hooks";
-import { CDPReactProvider } from "@coinbase/cdp-react";
+import { PrivyProvider } from "@privy-io/react-auth";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -8,6 +7,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { base } from "wagmi/chains";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<{
@@ -65,50 +65,18 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 const Providers = ({ children }: { children: React.ReactNode }) => (
-  <CDPReactProvider
+  <PrivyProvider
+    appId="cmi8e2idd00o2li0cf9847npq"
     config={{
-      projectId: "4d35e6de-5016-495b-befb-719eee9d0afa",
-      ethereum: {
-        // if you want to create an EVM account on login
-        createOnLogin: "eoa", // or "smart" for smart accounts
+      defaultChain: base,
+      supportedChains: [base],
+      embeddedWallets: {
+        ethereum: {
+          createOnLogin: "all-users",
+        },
       },
-      appName: "Stashbox",
-      appLogoUrl: "https://stashbox.deepso.dev/stashbox.png",
-      authMethods: ["email", "oauth:google"],
-    }}
-    theme={{
-      // Backgrounds
-      "colors-bg-default": "var(--color-background)",
-      "colors-bg-alternate": "var(--color-card)",
-      "colors-bg-primary": "var(--color-primary)",
-      "colors-bg-secondary": "var(--color-secondary)",
-
-      // Text
-      "colors-fg-default": "var(--color-foreground)",
-      "colors-fg-muted": "var(--color-muted-foreground)",
-      "colors-fg-primary": "var(--color-primary)",
-      "colors-fg-onPrimary": "var(--color-primary-foreground)",
-
-      // Borders
-      "colors-line-default": "var(--color-border)",
-      "colors-line-heavy": "var(--color-accent)",
-      "colors-line-primary": "var(--color-ring)",
-
-      // Typography
-      "font-family-sans": "var(--font-sans)",
-      "font-size-base": "16px",
     }}
   >
-    <CDPHooksProvider
-      config={{
-        projectId: "4d35e6de-5016-495b-befb-719eee9d0afa",
-        ethereum: {
-          // if you want to create an EVM account on login
-          createOnLogin: "eoa", // or "smart" for smart accounts
-        },
-      }}
-    >
-      {children}
-    </CDPHooksProvider>
-  </CDPReactProvider>
+    {children}
+  </PrivyProvider>
 );

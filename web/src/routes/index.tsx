@@ -1,36 +1,23 @@
-import { useIsInitialized, useIsSignedIn } from "@coinbase/cdp-hooks";
-import { AuthButton } from "@coinbase/cdp-react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useLogin, usePrivy } from "@privy-io/react-auth";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Image } from "@unpic/react";
-import { useEffect } from "react";
-import { Spinner } from "../components/ui/spinner";
+import { Button } from "../components/ui/button";
+import { checkLoginHint } from "../lib/auth";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: async () => {
+    const hint = await checkLoginHint();
+
+    if (hint) {
+      throw redirect({ to: "/home" });
+    }
+  },
   component: App,
 });
 
 function App() {
-  const { isInitialized } = useIsInitialized();
-  const { isSignedIn } = useIsSignedIn();
-  const router = useRouter();
-
-  useEffect(() => {
-    console.log({ isSignedIn });
-
-    if (isSignedIn) {
-      router.navigate({
-        to: "/comps",
-      });
-    }
-  }, [isSignedIn, router]);
-
-  if (!isInitialized) {
-    return (
-      <div className="flex min-h-screen w-full items-center justify-center p-4">
-        <Spinner />
-      </div>
-    );
-  }
+  const { login } = useLogin();
+  const { ready } = usePrivy();
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-between p-4">
@@ -56,7 +43,18 @@ function App() {
         width={200}
       />
 
-      <AuthButton />
+      <Button
+        className="hover:-translate-y-1 relative w-1/2 transition delay-100 duration-300 ease-in-out hover:scale-110"
+        disabled={!ready}
+        onClick={() =>
+          login({
+            loginMethods: ["email", "google"],
+          })
+        }
+        size="lg"
+      >
+        Get Started
+      </Button>
     </div>
   );
 }
