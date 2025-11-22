@@ -44,7 +44,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="vertical center mx-auto">
-        <div className="md:w-1/3">
+        <div className="md:w-1/3 [body.demo-page_&]:md:w-full">
           <Providers>{children}</Providers>
         </div>
         <TanStackDevtools

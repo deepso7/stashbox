@@ -219,8 +219,13 @@ function RouteComponent() {
     return () => document.removeEventListener("keydown", down);
   }, []);
 
+  useEffect(() => {
+    document.body.classList.add("demo-page");
+    return () => document.body.classList.remove("demo-page");
+  }, []);
+
   return (
-    <div className="p-4 [&_h3]:p-4 [&_h3]:py-4 [&_h3]:font-bold [&_h3]:text-xl [&_section]:break-inside-avoid [&_section]:rounded [&_section]:border [&_section]:p-2">
+    <div className="p-4 md:w-full [&_h3]:p-4 [&_h3]:py-4 [&_h3]:font-bold [&_h3]:text-xl [&_section]:break-inside-avoid [&_section]:rounded [&_section]:border [&_section]:p-2">
       <div className="columns-1 gap-6 space-y-6 md:columns-2 lg:columns-3">
         <section>
           <h3>Button Variants</h3>
