@@ -385,7 +385,7 @@ contract JarManagerTest is Test {
         jarManager.deposit(jarId, DEPOSIT_AMOUNT);
 
         JarManager.Jar memory jar = jarManager.getJar(alice, jarId);
-        uint256 value = jarManager.sharesValue(jar.shares);
+        uint256 value = jarManager.sharesPrincipalValue(jar.shares);
         
         assertEq(value, DEPOSIT_AMOUNT, "Shares value should equal deposit");
     }

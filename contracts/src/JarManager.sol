@@ -57,8 +57,8 @@ contract JarManager is ReentrancyGuard, Ownable {
     /// @param targetAmount Goal amount in token decimals
     /// @param shares Proportional shares in the shared pool
     /// @param principalDeposited Total principal deposited (excludes yield)
-    /// @param yieldDebt Debt used for accurate yield calculation (shares * accYieldPerShare at last interaction)
-    /// @param accumulatedYield Total yield accumulated (never decreases except on claim)
+    /// @param yieldDebt Debt used for accurate yield calculation
+    /// @param pendingYieldSnapshot Saved yield before share changes (preserves yield on withdrawal)
     /// @param isActive Whether the jar is active
     struct Jar {
         string name;
@@ -66,7 +66,7 @@ contract JarManager is ReentrancyGuard, Ownable {
         uint256 shares;
         uint256 principalDeposited;
         uint256 yieldDebt;
-        uint256 accumulatedYield;
+        uint256 pendingYieldSnapshot;
         bool isActive;
     }
 
@@ -172,7 +172,7 @@ contract JarManager is ReentrancyGuard, Ownable {
             shares: 0,
             principalDeposited: 0,
             yieldDebt: 0,
-            accumulatedYield: 0,
+            pendingYieldSnapshot: 0,
             isActive: true
         });
 
@@ -193,26 +193,32 @@ contract JarManager is ReentrancyGuard, Ownable {
         // Update yield distribution before changing shares
         _distributeYield();
 
-        // Accumulate any pending yield before modifying shares
-        jar.accumulatedYield += _pendingYield(jar);
-
-        // Calculate shares to mint
+        // Calculate shares to mint based on total pool value (principal + yield)
         uint256 sharesToMint;
         if (totalShares == 0) {
+            // First deposit: 1:1 ratio
             sharesToMint = amount;
         } else {
-            // shares = (amount * totalShares) / totalPrincipal
-            sharesToMint = (amount * totalShares) / totalPrincipal;
+            // Subsequent deposits: proportional to total pool value
+            // CRITICAL: totalValue = principal still in pool + undistributed yield
+            // We CANNOT use contract balance because it changes after withdrawals/claims
+            // totalValue represents what all existing shares are worth
+            uint256 undistributedYield = _getUndistributedYield();
+            uint256 totalValue = totalPrincipal + undistributedYield;
+            sharesToMint = (amount * totalShares) / totalValue;
         }
+
+        // Save pending yield before changing shares
+        jar.pendingYieldSnapshot += _pendingYield(jar);
 
         // Transfer tokens from user
         DEPOSIT_TOKEN.safeTransferFrom(msg.sender, address(this), amount);
         
-        // Update jar
+        // Update jar shares and principal
         jar.shares += sharesToMint;
         jar.principalDeposited += amount;
         
-        // Update yield debt: reset to current for all shares (accumulated yield is now tracked separately)
+        // Reset debt to current value for ALL shares (standard pattern)
         jar.yieldDebt = (jar.shares * accYieldPerShare) / PRECISION;
 
         // Update global state
@@ -238,8 +244,8 @@ contract JarManager is ReentrancyGuard, Ownable {
         // Update yield distribution before changing shares
         _distributeYield();
 
-        // Accumulate any pending yield before modifying shares
-        jar.accumulatedYield += _pendingYield(jar);
+        // Save pending yield to snapshot BEFORE changing shares
+        jar.pendingYieldSnapshot += _pendingYield(jar);
 
         // Calculate shares to burn proportionally based on principal withdrawn
         // Use jar's own shares to principal ratio for accurate calculation
@@ -254,7 +260,7 @@ contract JarManager is ReentrancyGuard, Ownable {
         jar.shares -= sharesToBurn;
         jar.principalDeposited -= amount;
         
-        // Reset yield debt for remaining shares (accumulated yield preserved in accumulatedYield field)
+        // Reset debt for new share amount (saved yield is in snapshot)
         jar.yieldDebt = (jar.shares * accYieldPerShare) / PRECISION;
 
         // Update global state
@@ -279,12 +285,12 @@ contract JarManager is ReentrancyGuard, Ownable {
         // Update yield distribution to get latest yield
         _distributeYield();
 
-        // Calculate total pending yield
+        // Calculate total pending yield (snapshot + new yield)
         uint256 yieldAmount = _pendingYield(jar);
         if (yieldAmount == 0) revert InsufficientYield();
 
-        // Reset accumulated yield and update debt to mark all yield as claimed
-        jar.accumulatedYield = 0;
+        // Reset snapshot and debt to mark all yield as claimed
+        jar.pendingYieldSnapshot = 0;
         jar.yieldDebt = (jar.shares * accYieldPerShare) / PRECISION;
 
         // Note: Yield is not part of position liquidity in our mock implementation
@@ -317,7 +323,7 @@ contract JarManager is ReentrancyGuard, Ownable {
         jar.shares = 0;
         jar.principalDeposited = 0;
         jar.yieldDebt = 0;
-        jar.accumulatedYield = 0;
+        jar.pendingYieldSnapshot = 0;
         jar.isActive = false;
 
         // Update global state
@@ -360,14 +366,14 @@ contract JarManager is ReentrancyGuard, Ownable {
     /// @param jar The jar to calculate pending yield for
     /// @return Pending yield amount
     function _pendingYield(Jar storage jar) internal view returns (uint256) {
-        // Start with previously accumulated yield
-        uint256 pending = jar.accumulatedYield;
+        // Start with saved yield from previous share changes
+        uint256 pending = jar.pendingYieldSnapshot;
         
-        // Add newly earned yield from current shares
+        // Add new yield earned by current shares
         if (jar.shares > 0) {
-            uint256 newlyAccumulated = (jar.shares * accYieldPerShare) / PRECISION;
-            if (newlyAccumulated > jar.yieldDebt) {
-                pending += newlyAccumulated - jar.yieldDebt;
+            uint256 accumulated = (jar.shares * accYieldPerShare) / PRECISION;
+            if (accumulated > jar.yieldDebt) {
+                pending += accumulated - jar.yieldDebt;
             }
         }
         
@@ -380,51 +386,63 @@ contract JarManager is ReentrancyGuard, Ownable {
 
     /// @notice Add liquidity to the Uniswap V4 pool
     /// @param amount The amount of tokens to add as liquidity
+    /// @dev MOCK IMPLEMENTATION: Ready for production V4 integration
+    ///      In production, this would:
+    ///      1. Approve tokens to PoolManager
+    ///      2. Call poolManager.modifyLiquidity() with appropriate parameters
+    ///      3. Handle the BalanceDelta returned
+    ///      4. Update position.liquidity based on actual liquidity added
     function _addLiquidity(uint256 amount) internal {
-        // For simplicity, this is a placeholder for V4 integration
-        // In production, you would:
-        // 1. Approve tokens to PoolManager
-        // 2. Call modifyLiquidity with appropriate parameters
-        // 3. Handle the BalanceDelta returned
-        // 4. Update position.liquidity
-
         DEPOSIT_TOKEN.approve(address(POOL_MANAGER), amount);
         
-        // Update position liquidity tracking
+        // Mock: Simply track liquidity amount
+        // Production: Would call POOL_MANAGER.modifyLiquidity()
         position.liquidity += uint128(amount);
     }
 
     /// @notice Remove liquidity from the Uniswap V4 pool
     /// @param amount The amount of tokens to remove from liquidity
+    /// @dev MOCK IMPLEMENTATION: Ready for production V4 integration
+    ///      In production, this would:
+    ///      1. Call poolManager.modifyLiquidity() with negative liquidity delta
+    ///      2. Handle the BalanceDelta returned
+    ///      3. Collect tokens from PoolManager
+    ///      4. Update position.liquidity based on actual liquidity removed
     function _removeLiquidity(uint256 amount) internal {
         if (position.liquidity < amount) revert InsufficientBalance();
 
-        // For simplicity, this is a placeholder for V4 integration
-        // In production, you would:
-        // 1. Call modifyLiquidity with negative liquidity delta
-        // 2. Handle the BalanceDelta returned
-        // 3. Collect tokens from PoolManager
-        // 4. Update position.liquidity
-
+        // Mock: Simply track liquidity amount
+        // Production: Would call POOL_MANAGER.modifyLiquidity()
         position.liquidity -= uint128(amount);
     }
 
-    /// @notice Collect fees from the V4 position
-    /// @return feesCollected The amount of fees collected
-    function _collectFees() internal returns (uint256 feesCollected) {
-        // Placeholder for V4 fee collection
-        // In production, this would call PoolManager to collect fees from the liquidity position
-        
-        // For testing/simulation: detect any NEW excess balance as yield
-        // totalYieldCollected tracks all yield ever distributed (even if claimed)
-        // So we compare current balance against (principal + all distributed yield)
-        // to find only NEW yield that hasn't been distributed yet
+    /// @notice Get undistributed yield that hasn't been processed yet
+    /// @return undistributedYield Amount of new yield not yet distributed
+    /// @dev WARNING: Direct token transfers to this contract will be counted as yield
+    ///      and distributed to all users proportionally. In production, consider implementing
+    ///      explicit deposit/withdrawal tracking to prevent this.
+    function _getUndistributedYield() internal view returns (uint256 undistributedYield) {
         uint256 currentBalance = DEPOSIT_TOKEN.balanceOf(address(this));
         uint256 accountedBalance = totalPrincipal + totalYieldCollected;
         
         if (currentBalance > accountedBalance) {
-            feesCollected = currentBalance - accountedBalance;
+            undistributedYield = currentBalance - accountedBalance;
         }
+        
+        return undistributedYield;
+    }
+
+    /// @notice Collect fees from the V4 position
+    /// @return feesCollected The amount of fees collected
+    /// @dev MOCK IMPLEMENTATION: In production, this would call PoolManager.collectFees()
+    ///      to collect actual fees from the Uniswap V4 liquidity position.
+    ///      Currently detects yield as any excess balance in the contract.
+    function _collectFees() internal returns (uint256 feesCollected) {
+        // For testing/simulation: detect any NEW excess balance as yield
+        // totalYieldCollected tracks all yield ever distributed (even if claimed)
+        // So we compare current balance against (principal + all distributed yield)
+        // to find only NEW yield that hasn't been distributed yet
+        feesCollected = _getUndistributedYield();
         
         return feesCollected;
     }
@@ -456,13 +474,11 @@ contract JarManager is ReentrancyGuard, Ownable {
         Jar storage jar = jars[owner][jarId];
         if (!jar.isActive) return 0;
 
-        // Start with previously accumulated yield
-        uint256 pending = jar.accumulatedYield;
+        // Start with saved yield snapshot
+        uint256 pending = jar.pendingYieldSnapshot;
 
         // Calculate pending fees that haven't been distributed yet
-        uint256 currentBalance = DEPOSIT_TOKEN.balanceOf(address(this));
-        uint256 accountedBalance = totalPrincipal + totalYieldCollected;
-        uint256 pendingFees = currentBalance > accountedBalance ? currentBalance - accountedBalance : 0;
+        uint256 pendingFees = _getUndistributedYield();
 
         // Calculate what accYieldPerShare would be after distribution
         uint256 projectedAccYieldPerShare = accYieldPerShare;
@@ -470,11 +486,11 @@ contract JarManager is ReentrancyGuard, Ownable {
             projectedAccYieldPerShare += (pendingFees * PRECISION) / totalShares;
         }
 
-        // Add newly earned yield from current shares
+        // Add new yield from current shares with projected rate
         if (jar.shares > 0) {
-            uint256 newlyAccumulated = (jar.shares * projectedAccYieldPerShare) / PRECISION;
-            if (newlyAccumulated > jar.yieldDebt) {
-                pending += newlyAccumulated - jar.yieldDebt;
+            uint256 accumulated = (jar.shares * projectedAccYieldPerShare) / PRECISION;
+            if (accumulated > jar.yieldDebt) {
+                pending += accumulated - jar.yieldDebt;
             }
         }
         
@@ -491,10 +507,12 @@ contract JarManager is ReentrancyGuard, Ownable {
         return jar.principalDeposited + pendingYield;
     }
 
-    /// @notice Calculate the value of shares
+    /// @notice Calculate the principal value of shares (excludes yield)
     /// @param shares The number of shares
-    /// @return value The value of the shares in tokens
-    function sharesValue(uint256 shares) public view returns (uint256 value) {
+    /// @return value The principal value represented by the shares
+    /// @dev This function only returns principal portion. For total value including yield,
+    ///      use getJarTotalBalance() or calculateCurrentYield() separately
+    function sharesPrincipalValue(uint256 shares) public view returns (uint256 value) {
         if (totalShares == 0) return 0;
         return (shares * totalPrincipal) / totalShares;
     }

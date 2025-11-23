@@ -124,13 +124,13 @@ contract JarManagerInvariantTest is Test {
     }
 
     /// @notice Invariant: Shares value equals principal when no yield
-    function invariant_sharesValueEquality() external {
+    function invariant_sharesPrincipalValueEquality() external {
         uint256 totalShares = jarManager.totalShares();
         uint256 totalPrincipal = jarManager.totalPrincipal();
 
         if (totalShares > 0) {
-            uint256 sharesValue = jarManager.sharesValue(totalShares);
-            assertEq(sharesValue, totalPrincipal, "Shares value mismatch");
+            uint256 sharesPrincipalValue = jarManager.sharesPrincipalValue(totalShares);
+            assertEq(sharesPrincipalValue, totalPrincipal, "Shares value mismatch");
         }
     }
 
@@ -143,12 +143,12 @@ contract JarManagerInvariantTest is Test {
                 JarManager.Jar memory jar = jarManager.getJar(actors[i], jars[j]);
                 
                 if (jar.isActive && jar.shares > 0) {
-                    uint256 sharesValue = jarManager.sharesValue(jar.shares);
+                    uint256 sharesPrincipalValue = jarManager.sharesPrincipalValue(jar.shares);
                     
                     // Shares value should approximately equal principal (allow small rounding error)
                     // Using 1% tolerance for rounding
                     assertApproxEqRel(
-                        sharesValue,
+                        sharesPrincipalValue,
                         jar.principalDeposited,
                         0.01e18,
                         "Jar shares value mismatch"
