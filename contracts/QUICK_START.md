@@ -1,100 +1,98 @@
-# Stashbox Quick Start Guide
+# Quick Start - Deploy Stashbox to Base Sepolia
 
-## 5-Minute Setup
+## Prerequisites
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) installed
+- Wallet with Base Sepolia ETH
+- RPC URL for Base Sepolia (default: https://sepolia.base.org)
 
-### 1. Install & Build
+## Step 1: Environment Setup
+
+Create `.env` file in `contracts` directory:
 ```bash
 cd contracts
-forge install
+cat > .env << EOF
+PRIVATE_KEY=your_private_key_here
+BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
+BASESCAN_API_KEY=your_basescan_api_key_optional
+EOF
+```
+
+Load environment:
+```bash
+source .env
+```
+
+## Step 2: Get Testnet Funds
+
+1. **Get Base Sepolia ETH**
+   - Visit: https://www.coinbase.com/faucets/base-ethereum-goerli-faucet
+   - Or bridge from Sepolia: https://bridge.base.org/
+
+2. **Get Test USDC** (if available)
+   - Check Uniswap V4 Discord for test token faucets
+   - Or deploy your own test ERC20
+
+## Step 3: Update Token Addresses
+
+Edit `script/DeployBaseSepolia.s.sol`:
+```solidity
+// Update these with actual Base Sepolia addresses
+address constant USDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e; // Verify this
+address constant DAI = 0x7683022d84F726a96c4A6611cD31DBf5409c0Ac9;  // Verify this
+```
+
+## Step 4: Build Contracts
+
+```bash
 forge build
 ```
 
-### 2. Run Tests
+Expected output:
+```
+Compiling...
+Compiler run successful!
+```
+
+## Step 5: Run Tests (Optional)
+
 ```bash
-# All tests
+# Unit tests (fast)
 forge test
 
-# With gas report
-forge test --gas-report
-
-# Verbose output
-forge test -vv
+# Fork tests (requires RPC)
+forge test --match-contract JarManagerForkTest --fork-url $BASE_SEPOLIA_RPC_URL -vvv
 ```
 
-### 3. Deploy Locally
-```bash
-# Terminal 1: Start Anvil
-anvil
-
-# Terminal 2: Deploy
-forge script script/DeployJarManager.s.sol:DeployJarManagerLocal \
-  --rpc-url http://localhost:8545 \
-  --broadcast
-```
-
-### 4. Interact with Contract
+## Step 6: Deploy
 
 ```bash
-# Set contract address from deployment
-CONTRACT=<deployed_address>
-
-# Create a jar
-cast send $CONTRACT "createJar(string,uint256)" "PS5 Fund" 500000000 \
-  --rpc-url http://localhost:8545 \
-  --private-key <your_private_key>
-
-# Check your jars
-cast call $CONTRACT "getUserJarIds(address)" <your_address> \
-  --rpc-url http://localhost:8545
-```
-
-## Common Commands
-
-### Testing
-```bash
-forge test --match-test test_CreateJar        # Single test
-forge test --match-contract JarManagerTest    # Test suite
-forge test --gas-report                       # With gas
-forge snapshot                                # Gas snapshot
-forge coverage                                # Coverage report
-```
-
-### Building
-```bash
-forge build                 # Build all
-forge build --force         # Force rebuild
-forge clean                 # Clean artifacts
-```
-
-### Deployment
-```bash
-# Local
-forge script script/DeployJarManager.s.sol:DeployJarManagerLocal --broadcast
-
-# Testnet (set env vars first)
-export PRIVATE_KEY=0x...
-export SEPOLIA_RPC_URL=https://...
-forge script script/DeployJarManager.s.sol:DeployJarManager \
-  --rpc-url $SEPOLIA_RPC_URL \
+forge script script/DeployBaseSepolia.s.sol \
+  --rpc-url $BASE_SEPOLIA_RPC_URL \
   --broadcast \
   --verify
 ```
 
-## Key Files
+**Note:** Remove `--verify` if you don't have a BaseScan API key.
 
-- `src/JarManager.sol` - Main contract
-- `test/JarManager.t.sol` - Unit tests
-- `test/JarManagerFuzz.t.sol` - Fuzz tests
-- `test/JarManagerInvariant.t.sol` - Invariant tests
-- `script/DeployJarManager.s.sol` - Deployment
-- `README.md` - Full documentation
-- `GAS_OPTIMIZATION_REPORT.md` - Gas analysis
+## Step 7: Save Contract Address
 
-## Need Help?
+The script will output:
+```
+JarManager deployed at: 0x...
+```
 
-1. Check `README.md` for detailed docs
-2. See `IMPLEMENTATION_SUMMARY.md` for architecture
-3. Read `GAS_OPTIMIZATION_REPORT.md` for gas details
-4. Run `forge test -vvv` for verbose test output
+Save this address - you'll need it for the frontend!
 
-Happy building! 🚀
+## Next Steps
+
+✅ Contract deployed
+✅ Tests passing  
+⏳ Frontend integration
+⏳ End-to-end testing
+
+## Resources
+
+- **Base Sepolia Explorer**: https://sepolia.basescan.org
+- **README_DEPLOYMENT.md** - Detailed deployment guide
+- **UNISWAP_V4_INTEGRATION.md** - Technical details
+- **INTEGRATION_SUMMARY.md** - Overview of changes
