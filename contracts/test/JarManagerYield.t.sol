@@ -392,9 +392,12 @@ contract JarManagerYieldTest is Test {
         uint256 yieldAmount = 100 * 1e6;
         usdc.mint(address(jarManager), yieldAmount);
 
-        // Expect event
-        vm.expectEmit(false, false, false, true);
-        emit JarManager.YieldDistributed(yieldAmount, 0); // Note: actual accYieldPerShare will be calculated
+        // Expect event with calculated accYieldPerShare
+        // accYieldPerShare = (yieldAmount * PRECISION) / totalShares
+        // = (100 * 1e6 * 1e18) / 1000 * 1e6 = 100000000000000000 = 1e17
+        uint256 expectedAccYieldPerShare = (yieldAmount * 1e18) / DEPOSIT_AMOUNT;
+        vm.expectEmit(true, true, true, true);
+        emit JarManager.YieldDistributed(yieldAmount, expectedAccYieldPerShare);
 
         jarManager.updateYield();
     }

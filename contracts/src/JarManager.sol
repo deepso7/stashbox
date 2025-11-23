@@ -58,6 +58,7 @@ contract JarManager is ReentrancyGuard, Ownable {
     /// @param shares Proportional shares in the shared pool
     /// @param principalDeposited Total principal deposited (excludes yield)
     /// @param yieldDebt Debt used for accurate yield calculation (shares * accYieldPerShare at last interaction)
+    /// @param accumulatedYield Total yield accumulated (never decreases except on claim)
     /// @param isActive Whether the jar is active
     struct Jar {
         string name;
@@ -65,6 +66,7 @@ contract JarManager is ReentrancyGuard, Ownable {
         uint256 shares;
         uint256 principalDeposited;
         uint256 yieldDebt;
+        uint256 accumulatedYield;
         bool isActive;
     }
 
@@ -170,6 +172,7 @@ contract JarManager is ReentrancyGuard, Ownable {
             shares: 0,
             principalDeposited: 0,
             yieldDebt: 0,
+            accumulatedYield: 0,
             isActive: true
         });
 
@@ -190,6 +193,9 @@ contract JarManager is ReentrancyGuard, Ownable {
         // Update yield distribution before changing shares
         _distributeYield();
 
+        // Accumulate any pending yield before modifying shares
+        jar.accumulatedYield += _pendingYield(jar);
+
         // Calculate shares to mint
         uint256 sharesToMint;
         if (totalShares == 0) {
@@ -205,6 +211,8 @@ contract JarManager is ReentrancyGuard, Ownable {
         // Update jar
         jar.shares += sharesToMint;
         jar.principalDeposited += amount;
+        
+        // Update yield debt: reset to current for all shares (accumulated yield is now tracked separately)
         jar.yieldDebt = (jar.shares * accYieldPerShare) / PRECISION;
 
         // Update global state
@@ -230,10 +238,12 @@ contract JarManager is ReentrancyGuard, Ownable {
         // Update yield distribution before changing shares
         _distributeYield();
 
-        // Calculate shares to burn proportionally
-        // Use the same ratio as deposits: shares per principal
-        // This ensures consistent accounting even after yield accrual
-        uint256 sharesToBurn = (amount * totalShares) / totalPrincipal;
+        // Accumulate any pending yield before modifying shares
+        jar.accumulatedYield += _pendingYield(jar);
+
+        // Calculate shares to burn proportionally based on principal withdrawn
+        // Use jar's own shares to principal ratio for accurate calculation
+        uint256 sharesToBurn = (amount * jar.shares) / jar.principalDeposited;
         
         // Ensure we don't burn more shares than the jar has
         if (sharesToBurn > jar.shares) {
@@ -243,6 +253,8 @@ contract JarManager is ReentrancyGuard, Ownable {
         // Update jar state
         jar.shares -= sharesToBurn;
         jar.principalDeposited -= amount;
+        
+        // Reset yield debt for remaining shares (accumulated yield preserved in accumulatedYield field)
         jar.yieldDebt = (jar.shares * accYieldPerShare) / PRECISION;
 
         // Update global state
@@ -252,7 +264,7 @@ contract JarManager is ReentrancyGuard, Ownable {
         // Remove liquidity from V4 pool
         _removeLiquidity(amount);
 
-        // Transfer tokens to user
+        // Transfer principal to user
         DEPOSIT_TOKEN.safeTransfer(msg.sender, amount);
 
         emit Withdrawn(msg.sender, jarId, amount, sharesToBurn);
@@ -267,11 +279,12 @@ contract JarManager is ReentrancyGuard, Ownable {
         // Update yield distribution to get latest yield
         _distributeYield();
 
-        // Calculate pending yield using accYieldPerShare pattern
+        // Calculate total pending yield
         uint256 yieldAmount = _pendingYield(jar);
         if (yieldAmount == 0) revert InsufficientYield();
 
-        // Update yield debt to mark yield as claimed
+        // Reset accumulated yield and update debt to mark all yield as claimed
+        jar.accumulatedYield = 0;
         jar.yieldDebt = (jar.shares * accYieldPerShare) / PRECISION;
 
         // Note: Yield is not part of position liquidity in our mock implementation
@@ -304,6 +317,7 @@ contract JarManager is ReentrancyGuard, Ownable {
         jar.shares = 0;
         jar.principalDeposited = 0;
         jar.yieldDebt = 0;
+        jar.accumulatedYield = 0;
         jar.isActive = false;
 
         // Update global state
@@ -346,16 +360,18 @@ contract JarManager is ReentrancyGuard, Ownable {
     /// @param jar The jar to calculate pending yield for
     /// @return Pending yield amount
     function _pendingYield(Jar storage jar) internal view returns (uint256) {
-        if (jar.shares == 0) return 0;
+        // Start with previously accumulated yield
+        uint256 pending = jar.accumulatedYield;
         
-        // pending = (shares * accYieldPerShare) / PRECISION - yieldDebt
-        uint256 accumulatedYield = (jar.shares * accYieldPerShare) / PRECISION;
-        
-        if (accumulatedYield <= jar.yieldDebt) {
-            return 0;
+        // Add newly earned yield from current shares
+        if (jar.shares > 0) {
+            uint256 newlyAccumulated = (jar.shares * accYieldPerShare) / PRECISION;
+            if (newlyAccumulated > jar.yieldDebt) {
+                pending += newlyAccumulated - jar.yieldDebt;
+            }
         }
         
-        return accumulatedYield - jar.yieldDebt;
+        return pending;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -438,7 +454,10 @@ contract JarManager is ReentrancyGuard, Ownable {
     /// @return currentYield The current yield amount
     function calculateCurrentYield(address owner, uint256 jarId) external view returns (uint256 currentYield) {
         Jar storage jar = jars[owner][jarId];
-        if (!jar.isActive || jar.shares == 0) return 0;
+        if (!jar.isActive) return 0;
+
+        // Start with previously accumulated yield
+        uint256 pending = jar.accumulatedYield;
 
         // Calculate pending fees that haven't been distributed yet
         uint256 currentBalance = DEPOSIT_TOKEN.balanceOf(address(this));
@@ -451,14 +470,15 @@ contract JarManager is ReentrancyGuard, Ownable {
             projectedAccYieldPerShare += (pendingFees * PRECISION) / totalShares;
         }
 
-        // Calculate pending yield with projected values
-        uint256 accumulatedYield = (jar.shares * projectedAccYieldPerShare) / PRECISION;
-        
-        if (accumulatedYield <= jar.yieldDebt) {
-            return 0;
+        // Add newly earned yield from current shares
+        if (jar.shares > 0) {
+            uint256 newlyAccumulated = (jar.shares * projectedAccYieldPerShare) / PRECISION;
+            if (newlyAccumulated > jar.yieldDebt) {
+                pending += newlyAccumulated - jar.yieldDebt;
+            }
         }
         
-        return accumulatedYield - jar.yieldDebt;
+        return pending;
     }
 
     /// @notice Get total balance (principal + yield) for a jar

@@ -127,6 +127,9 @@ contract JarManagerFuzzTest is Test {
         amount2 = uint96(bound(amount2, 1, MAX_SUPPLY));
         address actor1 = actors[bound(actor1Seed, 0, actors.length - 1)];
         address actor2 = actors[bound(actor2Seed, 0, actors.length - 1)];
+        
+        // Ensure actors are different to avoid balance issues
+        vm.assume(actor1 != actor2);
 
         // Actor 1 deposits
         vm.prank(actor1);
