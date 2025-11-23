@@ -1,16 +1,21 @@
-import { usePrivy } from "@privy-io/react-auth";
+import { useFundWallet, usePrivy } from "@privy-io/react-auth";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { Image } from "@unpic/react";
-import { LogOut } from "lucide-react";
+import { Copy, LogOut, Plus } from "lucide-react";
+import { toast } from "sonner";
+import { useAccount } from "wagmi";
+import { base } from "wagmi/chains";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import { Spinner } from "../components/ui/spinner";
 import { checkLoginHint } from "../lib/auth";
 
 export const Route = createFileRoute("/home")({
@@ -25,8 +30,10 @@ export const Route = createFileRoute("/home")({
 });
 
 function RouteComponent() {
-  const { user, logout } = usePrivy();
+  const { user, logout, ready } = usePrivy();
   const router = useRouter();
+  const { fundWallet } = useFundWallet();
+  const { address } = useAccount();
 
   const username =
     user?.google?.name?.split(" ")[0] ??
@@ -70,6 +77,30 @@ function RouteComponent() {
         <CardHeader>
           <CardTitle>Savings</CardTitle>
           <CardDescription>Total Saving till date</CardDescription>
+          <CardAction>
+            <Button
+              className="shadow-2xl"
+              disabled={!ready}
+              onClick={() => {
+                if (!address) {
+                  toast("No Address Found");
+                  return;
+                }
+
+                fundWallet({
+                  address,
+                  options: {
+                    chain: base,
+                    asset: "USDC",
+                  },
+                });
+              }}
+              size="icon-lg"
+              variant="secondary"
+            >
+              {ready ? <Plus /> : <Spinner />}
+            </Button>
+          </CardAction>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
@@ -78,6 +109,31 @@ function RouteComponent() {
           </div>
           <div>
             <p>5 Jars Active</p>
+          </div>
+          {/** biome-ignore lint/a11y/useFocusableInteractive: gg*/}
+          {/** biome-ignore lint/a11y/useSemanticElements: gg */}
+          {/** biome-ignore lint/a11y/useKeyWithClickEvents: gg */}
+          <div
+            className="cursor-pointer"
+            onClick={() => {
+              if (!address) {
+                return;
+              }
+
+              navigator.clipboard.writeText(address);
+              toast("Copied to clipboard");
+            }}
+            role="button"
+          >
+            <p className="font-light">
+              Your wallet address:
+              <div className="flex items-center gap-2">
+                <Copy size={16} />
+                <p className="h-6 w-48 items-center gap-2 truncate">
+                  {address}
+                </p>
+              </div>
+            </p>
           </div>
         </CardContent>
       </Card>

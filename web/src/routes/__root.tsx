@@ -1,4 +1,5 @@
 import { PrivyProvider } from "@privy-io/react-auth";
+import { createConfig, WagmiProvider } from "@privy-io/wagmi";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -7,7 +8,9 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { base } from "wagmi/chains";
+import { Toaster } from "sonner";
+import { http } from "viem";
+import { base, baseSepolia } from "wagmi/chains";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<{
@@ -47,6 +50,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <div className="md:w-1/3 [body.demo-page_&]:md:w-full">
           <Providers>{children}</Providers>
         </div>
+        <Toaster />
         <TanStackDevtools
           config={{
             position: "bottom-right",
@@ -64,6 +68,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   );
 }
 
+export const config = createConfig({
+  chains: [base, baseSepolia],
+  transports: {
+    [base.id]: http(),
+    [baseSepolia.id]: http(),
+  },
+});
+
 const Providers = ({ children }: { children: React.ReactNode }) => (
   <PrivyProvider
     appId="cmi8e2idd00o2li0cf9847npq"
@@ -77,6 +89,6 @@ const Providers = ({ children }: { children: React.ReactNode }) => (
       },
     }}
   >
-    {children}
+    <WagmiProvider config={config}>{children}</WagmiProvider>
   </PrivyProvider>
 );
